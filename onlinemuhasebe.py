@@ -215,6 +215,7 @@ else:
     with tabs[0]:
         st.subheader("Banka Hesapları Yönetimi")
         
+        # Ekleme Bölümü
         with st.form("bank_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -236,32 +237,34 @@ else:
             st.dataframe(pd.DataFrame(bankalar, columns=["ID", "Hesap Adı", "Bakiye (TL)"]), use_container_width=True)
             
             st.markdown("---")
-            col_duz, col_sil = st.columns(2)
-            with col_duz:
-                st.write("✏️ **Hesap Düzenle**")
-                edit_b_id = st.number_input("Düzenlenecek Banka ID:", min_value=1, step=1, key="edit_b_id")
-                new_b_name = st.text_input("Yeni Hesap Adı", key="new_b_name")
-                new_b_amount = st.number_input("Yeni Bakiye (TL)", min_value=0.0, step=100.0, format="%.2f", key="new_b_amount")
-                if st.button("Hesabı Güncelle"):
+            st.write("✏️ **Banka Hesabı Düzelt veya Sil**")
+            
+            b_secenekler = {f"ID: {b[0]} - {b[1]} (Bakiye: ₺{b[2]:,.2f})": b for b in bankalar}
+            secilen_b_str = st.selectbox("İşlem Yapılacak Banka Hesabını Seçin:", list(b_secenekler.keys()), key="sel_b_kard")
+            secilen_b = b_secenekler[secilen_b_str]
+
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                yeni_b_ad = st.text_input("Yeni Hesap Adı", value=secilen_b[1], key="yeni_b_ad")
+                yeni_b_bak = st.number_input("Yeni Bakiye (TL)", min_value=0.0, value=float(secilen_b[2]), step=100.0, format="%.2f", key="yeni_b_bak")
+                
+                if st.button("İşlemi Düzelt (Güncelle)", key="btn_b_duzelt"):
                     conn, cursor = get_db()
-                    cursor.execute("UPDATE bankalar SET ad = ?, bakiye = ? WHERE id = ? AND user_id = ?", (new_b_name, new_b_amount, edit_b_id, current_user_id))
-                    if cursor.rowcount > 0:
-                        conn.commit()
-                        st.success("Güncellendi!")
-                        conn.close()
-                        st.rerun()
-                    else:
-                        conn.close()
-                        st.error("ID bulunamadı.")
-            with col_sil:
-                st.write("🗑️ **Hesap Sil**")
-                del_b_id = st.number_input("Silinecek Banka ID:", min_value=1, step=1, key="del_b_id")
-                if st.button("Hesabı Sil"):
-                    conn, cursor = get_db()
-                    cursor.execute("DELETE FROM bankalar WHERE id = ? AND user_id = ?", (del_b_id, current_user_id))
+                    cursor.execute("UPDATE bankalar SET ad = ?, bakiye = ? WHERE id = ? AND user_id = ?", (yeni_b_ad, yeni_b_bak, secilen_b[0], current_user_id))
                     conn.commit()
                     conn.close()
-                    st.success("Silindi!")
+                    st.success("Banka hesabı başarıyla güncellendi!")
+                    st.rerun()
+
+            with d_col2:
+                st.write("")
+                st.write("")
+                if st.button("Seçili Hesabı Sil", key="btn_b_sil_secili", type="secondary"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM bankalar WHERE id = ? AND user_id = ?", (secilen_b[0], current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.success("Hesap silindi!")
                     st.rerun()
         else:
             st.info("Kayıtlı banka hesabı yok.")
@@ -295,32 +298,38 @@ else:
             st.dataframe(pd.DataFrame(card_data), use_container_width=True)
 
             st.markdown("---")
-            col_c_d, col_c_s = st.columns(2)
-            with col_c_d:
-                st.write("✏️ **Kart Düzenle**")
-                edit_c_id = st.number_input("Düzenlenecek Kart ID:", min_value=1, step=1, key="edit_c_id")
-                new_c_name = st.text_input("Yeni Kart Adı", key="new_c_name")
-                new_c_lim = st.number_input("Yeni Toplam Limit", min_value=0.0, step=500.0, format="%.2f", key="new_c_lim")
-                new_c_ava = st.number_input("Yeni Kullanılabilir Limit", min_value=0.0, step=500.0, format="%.2f", key="new_c_ava")
-                if st.button("Kartı Güncelle"):
-                    conn, cursor = get_db()
-                    cursor.execute("UPDATE kartlar SET ad = ?, limit_tutar = ?, kullanilabilir_tutar = ? WHERE id = ? AND user_id = ?", (new_c_name, new_c_lim, new_c_ava, edit_c_id, current_user_id))
-                    if cursor.rowcount > 0:
-                        conn.commit()
-                        st.success("Güncellendi!")
-                        conn.close()
-                        st.rerun()
+            st.write("✏️ **Kredi Kartını Düzelt veya Sil**")
+            
+            c_secenekler = {f"ID: {k[0]} - {k[1]} (Limit: ₺{k[2]:,.2f})": k for k in kartlar}
+            secilen_c_str = st.selectbox("İşlem Yapılacak Kartı Seçin:", list(c_secenekler.keys()), key="sel_c_kard")
+            secilen_c = c_secenekler[secilen_c_str]
+
+            dc_col1, dc_col2 = st.columns(2)
+            with dc_col1:
+                yeni_c_ad = st.text_input("Yeni Kart Adı", value=secilen_c[1], key="yeni_c_ad")
+                yeni_c_lim = st.number_input("Yeni Toplam Limit", min_value=0.0, value=float(secilen_c[2]), step=500.0, format="%.2f", key="yeni_c_lim")
+                yeni_c_ava = st.number_input("Yeni Kullanılabilir Limit", min_value=0.0, value=float(secilen_c[3]), step=500.0, format="%.2f", key="yeni_c_ava")
+                
+                if st.button("İşlemi Düzelt (Güncelle)", key="btn_c_duzelt"):
+                    if yeni_c_ava > yeni_c_lim:
+                        st.error("Kullanılabilir limit toplam limiti aşamaz!")
                     else:
+                        conn, cursor = get_db()
+                        cursor.execute("UPDATE kartlar SET ad = ?, limit_tutar = ?, kullanilabilir_tutar = ? WHERE id = ? AND user_id = ?", (yeni_c_ad, yeni_c_lim, yeni_c_ava, secilen_c[0], current_user_id))
+                        conn.commit()
                         conn.close()
-                        st.error("ID bulunamadı.")
-            with col_c_s:
-                st.write("🗑️ **Kart Sil**")
-                del_c_id = st.number_input("Silinecek Kart ID:", min_value=1, step=1, key="del_c_id")
-                if st.button("Kartı Sil"):
+                        st.success("Kart başarıyla güncellendi!")
+                        st.rerun()
+
+            with dc_col2:
+                st.write("")
+                st.write("")
+                if st.button("Seçili Kartı Sil", key="btn_c_sil_secili", type="secondary"):
                     conn, cursor = get_db()
-                    cursor.execute("DELETE FROM kartlar WHERE id = ? AND user_id = ?", (del_c_id, current_user_id))
+                    cursor.execute("DELETE FROM kartlar WHERE id = ? AND user_id = ?", (secilen_c[0], current_user_id))
                     conn.commit()
                     conn.close()
+                    st.success("Kart silindi!")
                     st.rerun()
         else:
             st.info("Kayıtlı kart yok.")
@@ -349,31 +358,34 @@ else:
             st.dataframe(pd.DataFrame(alacaklar, columns=["ID", "Açıklama", "Tutar"]), use_container_width=True)
 
             st.markdown("---")
-            col_r_d, col_r_s = st.columns(2)
-            with col_r_d:
-                st.write("✏️ **Alacak Düzenle**")
-                edit_r_id = st.number_input("Düzenlenecek Alacak ID:", min_value=1, step=1, key="edit_r_id")
-                new_r_name = st.text_input("Yeni Açıklama", key="new_r_name")
-                new_r_amt = st.number_input("Yeni Tutar", min_value=0.0, step=100.0, format="%.2f", key="new_r_amt")
-                if st.button("Alacağı Güncelle"):
+            st.write("✏️ **Alacağı Düzelt veya Sil**")
+            
+            r_secenekler = {f"ID: {a[0]} - {a[1]} (Tutar: ₺{a[2]:,.2f})": a for a in alacaklar}
+            secilen_r_str = st.selectbox("İşlem Yapılacak Alacağı Seçin:", list(r_secenekler.keys()), key="sel_r_kard")
+            secilen_r = r_secenekler[secilen_r_str]
+
+            dr_col1, dr_col2 = st.columns(2)
+            with dr_col1:
+                yeni_r_ad = st.text_input("Yeni Açıklama", value=secilen_r[1], key="yeni_r_ad")
+                yeni_r_amt = st.number_input("Yeni Tutar", min_value=0.0, value=float(secilen_r[2]), step=100.0, format="%.2f", key="yeni_r_amt")
+                
+                if st.button("İşlemi Düzelt (Güncelle)", key="btn_r_duzelt"):
                     conn, cursor = get_db()
-                    cursor.execute("UPDATE alacaklar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (new_r_name, new_r_amt, edit_r_id, current_user_id))
-                    if cursor.rowcount > 0:
-                        conn.commit()
-                        st.success("Güncellendi!")
-                        conn.close()
-                        st.rerun()
-                    else:
-                        conn.close()
-                        st.error("ID bulunamadı.")
-            with col_r_s:
-                st.write("🗑️ **Alacak Sil**")
-                del_r_id = st.number_input("Silinecek Alacak ID:", min_value=1, step=1, key="del_r_id")
-                if st.button("Alacağı Sil"):
-                    conn, cursor = get_db()
-                    cursor.execute("DELETE FROM alacaklar WHERE id = ? AND user_id = ?", (del_r_id, current_user_id))
+                    cursor.execute("UPDATE alacaklar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (yeni_r_ad, yeni_r_amt, secilen_r[0], current_user_id))
                     conn.commit()
                     conn.close()
+                    st.success("Alacak güncellendi!")
+                    st.rerun()
+
+            with dr_col2:
+                st.write("")
+                st.write("")
+                if st.button("Seçili Alacağı Sil", key="btn_r_sil_secili", type="secondary"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM alacaklar WHERE id = ? AND user_id = ?", (secilen_r[0], current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.success("Alacak silindi!")
                     st.rerun()
         else:
             st.info("Kayıtlı alacak yok.")
@@ -402,31 +414,34 @@ else:
             st.dataframe(pd.DataFrame(borclar, columns=["ID", "Açıklama", "Tutar"]), use_container_width=True)
 
             st.markdown("---")
-            col_d_d, col_d_s = st.columns(2)
-            with col_d_d:
-                st.write("✏️ **Borç Düzenle**")
-                edit_d_id = st.number_input("Düzenlenecek Borç ID:", min_value=1, step=1, key="edit_d_id")
-                new_d_name = st.text_input("Yeni Açıklama", key="new_d_name")
-                new_d_amt = st.number_input("Yeni Tutar", min_value=0.0, step=100.0, format="%.2f", key="new_d_amt")
-                if st.button("Borcu Güncelle"):
+            st.write("✏️ **Borcu Düzelt veya Sil**")
+            
+            d_secenekler = {f"ID: {d[0]} - {d[1]} (Tutar: ₺{d[2]:,.2f})": d for d in borclar}
+            secilen_d_str = st.selectbox("İşlem Yapılacak Borcu Seçin:", list(d_secenekler.keys()), key="sel_d_kard")
+            secilen_d = d_secenekler[secilen_d_str]
+
+            dd_col1, dd_col2 = st.columns(2)
+            with dd_col1:
+                yeni_d_ad = st.text_input("Yeni Açıklama", value=secilen_d[1], key="yeni_d_ad")
+                yeni_d_amt = st.number_input("Yeni Tutar", min_value=0.0, value=float(secilen_d[2]), step=100.0, format="%.2f", key="yeni_d_amt")
+                
+                if st.button("İşlemi Düzelt (Güncelle)", key="btn_d_duzelt"):
                     conn, cursor = get_db()
-                    cursor.execute("UPDATE borclar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (new_d_name, new_d_amt, edit_d_id, current_user_id))
-                    if cursor.rowcount > 0:
-                        conn.commit()
-                        st.success("Güncellendi!")
-                        conn.close()
-                        st.rerun()
-                    else:
-                        conn.close()
-                        st.error("ID bulunamadı.")
-            with col_d_s:
-                st.write("🗑️ **Borç Sil**")
-                del_d_id = st.number_input("Silinecek Borç ID:", min_value=1, step=1, key="del_d_id")
-                if st.button("Borcu Sil"):
-                    conn, cursor = get_db()
-                    cursor.execute("DELETE FROM borclar WHERE id = ? AND user_id = ?", (del_d_id, current_user_id))
+                    cursor.execute("UPDATE borclar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (yeni_d_ad, yeni_d_amt, secilen_d[0], current_user_id))
                     conn.commit()
                     conn.close()
+                    st.success("Borç güncellendi!")
+                    st.rerun()
+
+            with dd_col2:
+                st.write("")
+                st.write("")
+                if st.button("Seçili Borcu Sil", key="btn_d_sil_secili", type="secondary"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM borclar WHERE id = ? AND user_id = ?", (secilen_d[0], current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.success("Borç silindi!")
                     st.rerun()
         else:
             st.info("Kayıtlı borç yok.")
