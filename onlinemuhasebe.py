@@ -6,14 +6,24 @@ import json
 import pandas as pd
 import streamlit as st
 
-# Sayfa Ayarları
+# Sayfa Ayarları ve Streamlit Paylaşım/Deploy İkonlarını Gizleme
 st.set_page_config(
     page_title="Bireysel Muhasebe Platformu",
     page_icon="⚖️",
     layout="wide"
 )
 
-# Kendi Yönetici E-Posta Adresini buraya yazmalısın:
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# Kendi Yönetici E-Posta Adresini buraya yazabilirsin:
 ADMIN_EMAIL = "admin@kalkanmuhasebe.com"
 
 # Şifreleri güvenli saklamak için hashleme fonksiyonu
@@ -215,7 +225,6 @@ else:
     with tabs[0]:
         st.subheader("Banka Hesapları Yönetimi")
         
-        # Ekleme Bölümü
         with st.form("bank_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -237,7 +246,7 @@ else:
             st.dataframe(pd.DataFrame(bankalar, columns=["ID", "Hesap Adı", "Bakiye (TL)"]), use_container_width=True)
             
             st.markdown("---")
-            st.write("✏️ **Banka Hesabı Düzelt veya Sil**")
+            st.write("✏️ **Banka Hesabını Düzelt veya Sil**")
             
             b_secenekler = {f"ID: {b[0]} - {b[1]} (Bakiye: ₺{b[2]:,.2f})": b for b in bankalar}
             secilen_b_str = st.selectbox("İşlem Yapılacak Banka Hesabını Seçin:", list(b_secenekler.keys()), key="sel_b_kard")
@@ -486,20 +495,3 @@ else:
                         conn.close()
                         st.success("Kullanıcı silindi!")
                         st.rerun()
-# Sayfa Ayarları
-st.set_page_config(
-    page_title="Bireysel Muhasebe Platformu",
-    page_icon="⚖️",
-    layout="wide"
-)
-
-# Streamlit'in üst menü, "Deploy" ve "GitHub" ikonlarını gizleyen CSS kodu
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
