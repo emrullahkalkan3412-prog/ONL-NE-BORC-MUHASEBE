@@ -486,3 +486,20 @@ else:
                         conn.close()
                         st.success("Kullanıcı silindi!")
                         st.rerun()
+# Sayfa Ayarları
+st.set_page_config(
+    page_title="Bireysel Muhasebe Platformu",
+    page_icon="⚖️",
+    layout="wide"
+)
+
+# Streamlit'in üst menü, "Deploy" ve "GitHub" ikonlarını gizleyen CSS kodu
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
