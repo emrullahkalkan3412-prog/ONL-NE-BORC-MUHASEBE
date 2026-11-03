@@ -25,7 +25,6 @@ def init_db():
     conn = sqlite3.connect("muhasebe.db")
     cursor = conn.cursor()
     
-    # 1. Kullanıcılar Tablosu
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kullanicilar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +33,6 @@ def init_db():
         )
     """)
     
-    # 2. Banka Hesapları
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bankalar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +43,6 @@ def init_db():
         )
     """)
     
-    # 3. Kredi Kartları
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kartlar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +54,6 @@ def init_db():
         )
     """)
     
-    # 4. Dışarıdaki Alacaklar
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS alacaklar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +64,6 @@ def init_db():
         )
     """)
     
-    # 5. Diğer Borçlar
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS borclar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,7 +122,7 @@ if not st.session_state["logged_in"]:
                 except sqlite3.IntegrityError:
                     st.error("Bu e-posta adresi zaten kayıtlı!")
                     
-    else: # Giriş Yap
+    else:
         st.subheader("Hesabınıza Giriş Yapın")
         giris_email = st.text_input("E-Posta Adresi").strip().lower()
         giris_sifre = st.text_input("Şifre", type="password")
@@ -151,14 +146,13 @@ if not st.session_state["logged_in"]:
                 st.error("Hatalı e-posta veya şifre!")
 
 # ---------------------------------------------------------
-# ANA UYGULAMA (Giriş Yapıldıysa)
+# ANA UYGULAMA
 # ---------------------------------------------------------
 else:
     current_user_id = st.session_state["user_id"]
     current_email = st.session_state["email"]
     is_admin = (current_email == ADMIN_EMAIL.lower())
 
-    # Üst Bilgi Alanı
     col_baslik, col_cikis = st.columns([5, 1])
     with col_baslik:
         st.title("⚖️ Bireysel Muhasebe")
@@ -175,9 +169,7 @@ else:
 
     st.divider()
 
-    # Verileri Çekme ve Genel Finansal Durum Hesabı
     conn, cursor = get_db()
-
     cursor.execute("SELECT id, ad, bakiye FROM bankalar WHERE user_id = ?", (current_user_id,))
     bankalar = cursor.fetchall()
 
@@ -189,7 +181,6 @@ else:
 
     cursor.execute("SELECT id, ad, tutar FROM borclar WHERE user_id = ?", (current_user_id,))
     borclar = cursor.fetchall()
-
     conn.close()
 
     bank_total = sum(b[2] for b in bankalar)
@@ -201,21 +192,19 @@ else:
     total_debts = card_debt_total + debt_total
     net_status = total_assets - total_debts
 
-    # Finansal Özet Kartları (Dashboard)
+    # Özet Kartları
     m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
     m1.metric("Banka Hesapları", f"₺{bank_total:,.2f}")
-    m2.metric("Dışarıdaki Alacaklar", f"₺{receivable_total:,.2f}")
-    m3.metric("Kredi Kartı Borcu", f"₺{card_debt_total:,.2f}")
+    m2.metric("Alacaklar", f"₺{receivable_total:,.2f}")
+    m3.metric("Kart Borcu", f"₺{card_debt_total:,.2f}")
     m4.metric("Diğer Borçlar", f"₺{debt_total:,.2f}")
     m5.metric("Toplam Varlık", f"₺{total_assets:,.2f}")
     m6.metric("Toplam Borç", f"₺{total_debts:,.2f}")
-    
     net_label = "Net Varlık" if net_status >= 0 else "Net Borç"
     m7.metric(net_label, f"₺{abs(net_status):,.2f}", delta=f"₺{net_status:,.2f}")
 
     st.divider()
 
-    # Sekmeler
     tab_list = ["🏛️ BANKA HESAPLARI", "💳 KREDİ KARTLARI", "🤝 ALACAKLAR", "💸 DİĞER BORÇLAR", "💾 YEDEKLEME"]
     if is_admin:
         tab_list.append("👑 YÖNETİCİ PANELİ")
@@ -224,254 +213,261 @@ else:
 
     # -------------------- 1. BANKA HESAPLARI --------------------
     with tabs[0]:
-        st.subheader("Banka Hesapları")
+        st.subheader("Banka Hesapları Yönetimi")
+        
         with st.form("bank_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
                 b_name = st.text_input("Hesap Adı", placeholder="Örn. Maaş Hesabı")
             with col2:
                 b_amount = st.number_input("Bakiye (TL)", min_value=0.0, step=100.0, format="%.2f")
-            
-            if st.form_submit_button("Hesap Ekle"):
+            if st.form_submit_button("Yeni Hesap Ekle"):
                 if not b_name:
                     st.warning("Lütfen hesap adını girin.")
                 else:
                     conn, cursor = get_db()
-                    cursor.execute("INSERT INTO bankalar (user_id, ad, bakiye) VALUES (?, ?, ?)", 
-                                   (current_user_id, b_name, b_amount))
+                    cursor.execute("INSERT INTO bankalar (user_id, ad, bakiye) VALUES (?, ?, ?)", (current_user_id, b_name, b_amount))
                     conn.commit()
                     conn.close()
-                    st.success("Banka hesabı eklendi!")
+                    st.success("Eklendi!")
                     st.rerun()
 
         if bankalar:
-            df_b = pd.DataFrame(bankalar, columns=["ID", "Hesap Adı", "Bakiye (TL)"])
-            df_b["Bakiye (TL)"] = df_b["Bakiye (TL)"].apply(lambda x: f"₺{x:,.2f}")
-            st.dataframe(df_b, use_container_width=True)
-
-            del_b_id = st.number_input("Silinecek Banka ID:", min_value=1, step=1, key="del_b")
-            if st.button("Hesabı Sil", key="btn_del_b"):
-                conn, cursor = get_db()
-                cursor.execute("DELETE FROM bankalar WHERE id = ? AND user_id = ?", (del_b_id, current_user_id))
-                conn.commit()
-                conn.close()
-                st.rerun()
+            st.dataframe(pd.DataFrame(bankalar, columns=["ID", "Hesap Adı", "Bakiye (TL)"]), use_container_width=True)
+            
+            st.markdown("---")
+            col_duz, col_sil = st.columns(2)
+            with col_duz:
+                st.write("✏️ **Hesap Düzenle**")
+                edit_b_id = st.number_input("Düzenlenecek Banka ID:", min_value=1, step=1, key="edit_b_id")
+                new_b_name = st.text_input("Yeni Hesap Adı", key="new_b_name")
+                new_b_amount = st.number_input("Yeni Bakiye (TL)", min_value=0.0, step=100.0, format="%.2f", key="new_b_amount")
+                if st.button("Hesabı Güncelle"):
+                    conn, cursor = get_db()
+                    cursor.execute("UPDATE bankalar SET ad = ?, bakiye = ? WHERE id = ? AND user_id = ?", (new_b_name, new_b_amount, edit_b_id, current_user_id))
+                    if cursor.rowcount > 0:
+                        conn.commit()
+                        st.success("Güncellendi!")
+                        conn.close()
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("ID bulunamadı.")
+            with col_sil:
+                st.write("🗑️ **Hesap Sil**")
+                del_b_id = st.number_input("Silinecek Banka ID:", min_value=1, step=1, key="del_b_id")
+                if st.button("Hesabı Sil"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM bankalar WHERE id = ? AND user_id = ?", (del_b_id, current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.success("Silindi!")
+                    st.rerun()
         else:
-            st.info("Henüz kayıtlı banka hesabı yok.")
+            st.info("Kayıtlı banka hesabı yok.")
 
     # -------------------- 2. KREDİ KARTLARI --------------------
     with tabs[1]:
-        st.subheader("Kredi Kartları")
-        st.caption("Kart borcu = Toplam Limit − Kullanılabilir Limit olarak otomatik hesaplanır.")
-        
+        st.subheader("Kredi Kartları Yönetimi")
         with st.form("card_form", clear_on_submit=True):
             col1, col2, col3 = st.columns(3)
             with col1:
-                c_name = st.text_input("Kart Adı", placeholder="Örn. Ana Kredi Kartı")
+                c_name = st.text_input("Kart Adı", placeholder="Örn. Bonus Kart")
             with col2:
-                c_limit = st.number_input("Toplam Kart Limiti (TL)", min_value=0.0, step=500.0, format="%.2f")
+                c_limit = st.number_input("Toplam Limit (TL)", min_value=0.0, step=500.0, format="%.2f")
             with col3:
                 c_avail = st.number_input("Kullanılabilir Limit (TL)", min_value=0.0, step=500.0, format="%.2f")
-
-            if st.form_submit_button("Kart Ekle"):
+            if st.form_submit_button("Yeni Kart Ekle"):
                 if not c_name:
-                    st.warning("Lütfen kart adını girin.")
+                    st.warning("Kart adı girin.")
                 elif c_avail > c_limit:
-                    st.error("Kullanılabilir limit, toplam kart limitinden büyük olamaz!")
+                    st.error("Kullanılabilir limit toplam limiti aşamaz.")
                 else:
                     conn, cursor = get_db()
-                    cursor.execute("INSERT INTO kartlar (user_id, ad, limit_tutar, kullanilabilir_tutar) VALUES (?, ?, ?, ?)", 
-                                   (current_user_id, c_name, c_limit, c_avail))
+                    cursor.execute("INSERT INTO kartlar (user_id, ad, limit_tutar, kullanilabilir_tutar) VALUES (?, ?, ?, ?)", (current_user_id, c_name, c_limit, c_avail))
                     conn.commit()
                     conn.close()
-                    st.success("Kredi kartı eklendi!")
+                    st.success("Kart eklendi!")
                     st.rerun()
 
         if kartlar:
-            card_data = []
-            for k in kartlar:
-                k_id, k_ad, k_lim, k_ava = k
-                k_borc = max(0, k_lim - k_ava)
-                card_data.append({
-                    "ID": k_id,
-                    "Kart Adı": k_ad,
-                    "Toplam Limit": f"₺{k_lim:,.2f}",
-                    "Kullanılabilir Limit": f"₺{k_ava:,.2f}",
-                    "Hesaplanan Borç": f"₺{k_borc:,.2f}"
-                })
+            card_data = [{"ID": k[0], "Kart Adı": k[1], "Limit": k[2], "Kullanılabilir": k[3], "Borç": max(0, k[2]-k[3])} for k in kartlar]
             st.dataframe(pd.DataFrame(card_data), use_container_width=True)
 
-            del_c_id = st.number_input("Silinecek Kart ID:", min_value=1, step=1, key="del_c")
-            if st.button("Kartı Sil", key="btn_del_c"):
-                conn, cursor = get_db()
-                cursor.execute("DELETE FROM kartlar WHERE id = ? AND user_id = ?", (del_c_id, current_user_id))
-                conn.commit()
-                conn.close()
-                st.rerun()
+            st.markdown("---")
+            col_c_d, col_c_s = st.columns(2)
+            with col_c_d:
+                st.write("✏️ **Kart Düzenle**")
+                edit_c_id = st.number_input("Düzenlenecek Kart ID:", min_value=1, step=1, key="edit_c_id")
+                new_c_name = st.text_input("Yeni Kart Adı", key="new_c_name")
+                new_c_lim = st.number_input("Yeni Toplam Limit", min_value=0.0, step=500.0, format="%.2f", key="new_c_lim")
+                new_c_ava = st.number_input("Yeni Kullanılabilir Limit", min_value=0.0, step=500.0, format="%.2f", key="new_c_ava")
+                if st.button("Kartı Güncelle"):
+                    conn, cursor = get_db()
+                    cursor.execute("UPDATE kartlar SET ad = ?, limit_tutar = ?, kullanilabilir_tutar = ? WHERE id = ? AND user_id = ?", (new_c_name, new_c_lim, new_c_ava, edit_c_id, current_user_id))
+                    if cursor.rowcount > 0:
+                        conn.commit()
+                        st.success("Güncellendi!")
+                        conn.close()
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("ID bulunamadı.")
+            with col_c_s:
+                st.write("🗑️ **Kart Sil**")
+                del_c_id = st.number_input("Silinecek Kart ID:", min_value=1, step=1, key="del_c_id")
+                if st.button("Kartı Sil"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM kartlar WHERE id = ? AND user_id = ?", (del_c_id, current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.rerun()
         else:
-            st.info("Henüz kayıtlı kredi kartı yok.")
+            st.info("Kayıtlı kart yok.")
 
     # -------------------- 3. ALACAKLAR --------------------
     with tabs[2]:
-        st.subheader("Dışarıdaki Alacaklar")
+        st.subheader("Dışarıdaki Alacaklar Yönetimi")
         with st.form("rec_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                r_name = st.text_input("Kişi / Açıklama", placeholder="Örn. Ahmet — verilen borç")
+                r_name = st.text_input("Kişi / Açıklama")
             with col2:
                 r_amount = st.number_input("Kalan Alacak (TL)", min_value=0.0, step=100.0, format="%.2f")
-
             if st.form_submit_button("Alacak Ekle"):
                 if not r_name:
-                    st.warning("Lütfen açıklama girin.")
+                    st.warning("Açıklama girin.")
                 else:
                     conn, cursor = get_db()
-                    cursor.execute("INSERT INTO alacaklar (user_id, ad, tutar) VALUES (?, ?, ?)", 
-                                   (current_user_id, r_name, r_amount))
+                    cursor.execute("INSERT INTO alacaklar (user_id, ad, tutar) VALUES (?, ?, ?)", (current_user_id, r_name, r_amount))
                     conn.commit()
                     conn.close()
-                    st.success("Alacak kaydı eklendi!")
+                    st.success("Eklendi!")
                     st.rerun()
 
         if alacaklar:
-            df_a = pd.DataFrame(alacaklar, columns=["ID", "Kişi / Açıklama", "Kalan Alacak (TL)"])
-            df_a["Kalan Alacak (TL)"] = df_a["Kalan Alacak (TL)"].apply(lambda x: f"₺{x:,.2f}")
-            st.dataframe(df_a, use_container_width=True)
+            st.dataframe(pd.DataFrame(alacaklar, columns=["ID", "Açıklama", "Tutar"]), use_container_width=True)
 
-            del_r_id = st.number_input("Silinecek Alacak ID:", min_value=1, step=1, key="del_r")
-            if st.button("Alacağı Sil", key="btn_del_r"):
-                conn, cursor = get_db()
-                cursor.execute("DELETE FROM alacaklar WHERE id = ? AND user_id = ?", (del_r_id, current_user_id))
-                conn.commit()
-                conn.close()
-                st.rerun()
+            st.markdown("---")
+            col_r_d, col_r_s = st.columns(2)
+            with col_r_d:
+                st.write("✏️ **Alacak Düzenle**")
+                edit_r_id = st.number_input("Düzenlenecek Alacak ID:", min_value=1, step=1, key="edit_r_id")
+                new_r_name = st.text_input("Yeni Açıklama", key="new_r_name")
+                new_r_amt = st.number_input("Yeni Tutar", min_value=0.0, step=100.0, format="%.2f", key="new_r_amt")
+                if st.button("Alacağı Güncelle"):
+                    conn, cursor = get_db()
+                    cursor.execute("UPDATE alacaklar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (new_r_name, new_r_amt, edit_r_id, current_user_id))
+                    if cursor.rowcount > 0:
+                        conn.commit()
+                        st.success("Güncellendi!")
+                        conn.close()
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("ID bulunamadı.")
+            with col_r_s:
+                st.write("🗑️ **Alacak Sil**")
+                del_r_id = st.number_input("Silinecek Alacak ID:", min_value=1, step=1, key="del_r_id")
+                if st.button("Alacağı Sil"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM alacaklar WHERE id = ? AND user_id = ?", (del_r_id, current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.rerun()
         else:
-            st.info("Henüz kayıtlı alacak yok.")
+            st.info("Kayıtlı alacak yok.")
 
     # -------------------- 4. DİĞER BORÇLAR --------------------
     with tabs[3]:
-        st.subheader("Diğer Borçlar")
+        st.subheader("Diğer Borçlar Yönetimi")
         with st.form("debt_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                d_name = st.text_input("Kişi / Açıklama", placeholder="Örn. İhtiyaç kredisi")
+                d_name = st.text_input("Kişi / Açıklama")
             with col2:
                 d_amount = st.number_input("Kalan Borç (TL)", min_value=0.0, step=100.0, format="%.2f")
-
             if st.form_submit_button("Borç Ekle"):
                 if not d_name:
-                    st.warning("Lütfen açıklama girin.")
+                    st.warning("Açıklama girin.")
                 else:
                     conn, cursor = get_db()
-                    cursor.execute("INSERT INTO borclar (user_id, ad, tutar) VALUES (?, ?, ?)", 
-                                   (current_user_id, d_name, d_amount))
+                    cursor.execute("INSERT INTO borclar (user_id, ad, tutar) VALUES (?, ?, ?)", (current_user_id, d_name, d_amount))
                     conn.commit()
                     conn.close()
-                    st.success("Borç kaydı eklendi!")
+                    st.success("Eklendi!")
                     st.rerun()
 
         if borclar:
-            df_d = pd.DataFrame(borclar, columns=["ID", "Kişi / Açıklama", "Kalan Borç (TL)"])
-            df_d["Kalan Borç (TL)"] = df_d["Kalan Borç (TL)"].apply(lambda x: f"₺{x:,.2f}")
-            st.dataframe(df_d, use_container_width=True)
+            st.dataframe(pd.DataFrame(borclar, columns=["ID", "Açıklama", "Tutar"]), use_container_width=True)
 
-            del_d_id = st.number_input("Silinecek Borç ID:", min_value=1, step=1, key="del_d")
-            if st.button("Borcu Sil", key="btn_del_d"):
-                conn, cursor = get_db()
-                cursor.execute("DELETE FROM borclar WHERE id = ? AND user_id = ?", (del_d_id, current_user_id))
-                conn.commit()
-                conn.close()
-                st.rerun()
+            st.markdown("---")
+            col_d_d, col_d_s = st.columns(2)
+            with col_d_d:
+                st.write("✏️ **Borç Düzenle**")
+                edit_d_id = st.number_input("Düzenlenecek Borç ID:", min_value=1, step=1, key="edit_d_id")
+                new_d_name = st.text_input("Yeni Açıklama", key="new_d_name")
+                new_d_amt = st.number_input("Yeni Tutar", min_value=0.0, step=100.0, format="%.2f", key="new_d_amt")
+                if st.button("Borcu Güncelle"):
+                    conn, cursor = get_db()
+                    cursor.execute("UPDATE borclar SET ad = ?, tutar = ? WHERE id = ? AND user_id = ?", (new_d_name, new_d_amt, edit_d_id, current_user_id))
+                    if cursor.rowcount > 0:
+                        conn.commit()
+                        st.success("Güncellendi!")
+                        conn.close()
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("ID bulunamadı.")
+            with col_d_s:
+                st.write("🗑️ **Borç Sil**")
+                del_d_id = st.number_input("Silinecek Borç ID:", min_value=1, step=1, key="del_d_id")
+                if st.button("Borcu Sil"):
+                    conn, cursor = get_db()
+                    cursor.execute("DELETE FROM borclar WHERE id = ? AND user_id = ?", (del_d_id, current_user_id))
+                    conn.commit()
+                    conn.close()
+                    st.rerun()
         else:
-            st.info("Henüz kayıtlı borç yok.")
+            st.info("Kayıtlı borç yok.")
 
-    # -------------------- 5. YEDEKLEME (JSON EXPORT/IMPORT) --------------------
+    # -------------------- 5. YEDEKLEME --------------------
     with tabs[4]:
         st.subheader("Yedekleme ve Aktarım")
-        st.caption("Verileriniz bulut veritabanında saklanır. İsterseniz JSON formatında bilgisayarınıza indirebilirsiniz.")
-
         user_backup = {
             "banks": [{"name": b[1], "amount": b[2]} for b in bankalar],
             "cards": [{"name": k[1], "limit": k[2], "available": k[3]} for k in kartlar],
             "receivables": [{"name": a[1], "amount": a[2]} for a in alacaklar],
             "debts": [{"name": d[1], "amount": d[2]} for d in borclar]
         }
+        st.download_button("📥 Yedeği İndir (JSON)", data=json.dumps(user_backup, ensure_ascii=False, indent=2), file_name="yedek.json", mime="application/json")
 
-        json_str = json.dumps(user_backup, ensure_ascii=False, indent=2)
-        st.download_button(
-            label="📥 Yedeği İndir (JSON)",
-            data=json_str,
-            file_name=f"bireysel_muhasebe_yedek_{datetime.now().strftime('%Y%m%d')}.json",
-            mime="application/json"
-        )
-
-        st.markdown("---")
-        st.write("📤 **Yedek Yükle**")
-        uploaded_file = st.file_uploader("JSON yedek dosyanızı seçin", type=["json"])
-        
-        if uploaded_file is not None:
-            if st.button("Yedeği Veritabanına Yükle"):
-                try:
-                    imp_data = json.load(uploaded_file)
-                    conn, cursor = get_db()
-                    
-                    # Önce kullanıcının mevcut verilerini temizleyelim
-                    cursor.execute("DELETE FROM bankalar WHERE user_id = ?", (current_user_id,))
-                    cursor.execute("DELETE FROM kartlar WHERE user_id = ?", (current_user_id,))
-                    cursor.execute("DELETE FROM alacaklar WHERE user_id = ?", (current_user_id,))
-                    cursor.execute("DELETE FROM borclar WHERE user_id = ?", (current_user_id,))
-
-                    # Yeni verileri yükleyelim
-                    for b in imp_data.get("banks", []):
-                        cursor.execute("INSERT INTO bankalar (user_id, ad, bakiye) VALUES (?, ?, ?)", (current_user_id, b["name"], b["amount"]))
-                    for k in imp_data.get("cards", []):
-                        cursor.execute("INSERT INTO kartlar (user_id, ad, limit_tutar, kullanilabilir_tutar) VALUES (?, ?, ?, ?)", (current_user_id, k["name"], k["limit"], k["available"]))
-                    for a in imp_data.get("receivables", []):
-                        cursor.execute("INSERT INTO alacaklar (user_id, ad, tutar) VALUES (?, ?, ?)", (current_user_id, a["name"], a["amount"]))
-                    for d in imp_data.get("debts", []):
-                        cursor.execute("INSERT INTO borclar (user_id, ad, tutar) VALUES (?, ?, ?)", (current_user_id, d["name"], d["amount"]))
-
-                    conn.commit()
-                    conn.close()
-                    st.success("Yedek başarıyla yüklendi!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Yedek yüklenirken hata oluştu: {e}")
-
-    # -------------------- 6. YÖNETİCİ PANELİ (Admin Only) --------------------
+    # -------------------- 6. YÖNETİCİ PANELİ --------------------
     if is_admin:
         with tabs[5]:
             st.subheader("👑 Yönetici Paneli")
-            
             conn, cursor = get_db()
             cursor.execute("SELECT COUNT(*) FROM kullanicilar")
             u_count = cursor.fetchone()[0]
-            
             cursor.execute("SELECT id, email FROM kullanicilar ORDER BY id ASC")
             all_users = cursor.fetchall()
             conn.close()
 
-            st.metric("Sistemdeki Toplam Kayıtlı Kullanıcı", u_count)
-            st.markdown("---")
-            
+            st.metric("Toplam Kullanıcı", u_count)
             if all_users:
-                df_users = pd.DataFrame(all_users, columns=["Kullanıcı ID", "E-Posta Adresi"])
-                st.dataframe(df_users, use_container_width=True)
-
-                st.write("⚠️ **Kullanıcı Hesabı Silme**")
-                del_user_id = st.number_input("Silmek İstediğiniz Kullanıcı ID:", min_value=1, step=1, key="del_u_admin")
-                
-                if st.button("Kullanıcıyı ve Tüm Verilerini Sil"):
-                    if del_user_id == current_user_id:
-                        st.error("Kendi yönetici hesabınızı buradan silemezsiniz!")
+                st.dataframe(pd.DataFrame(all_users, columns=["ID", "E-Posta"]), use_container_width=True)
+                del_u_id = st.number_input("Silinecek Kullanıcı ID:", min_value=1, step=1, key="del_u_id")
+                if st.button("Kullanıcıyı Sil"):
+                    if del_u_id == current_user_id:
+                        st.error("Kendi hesabınızı silemezsiniz!")
                     else:
                         conn, cursor = get_db()
-                        cursor.execute("DELETE FROM bankalar WHERE user_id = ?", (del_user_id,))
-                        cursor.execute("DELETE FROM kartlar WHERE user_id = ?", (del_user_id,))
-                        cursor.execute("DELETE FROM alacaklar WHERE user_id = ?", (del_user_id,))
-                        cursor.execute("DELETE FROM borclar WHERE user_id = ?", (del_user_id,))
-                        cursor.execute("DELETE FROM kullanicilar WHERE id = ?", (del_user_id,))
+                        cursor.execute("DELETE FROM bankalar WHERE user_id = ?", (del_u_id,))
+                        cursor.execute("DELETE FROM kartlar WHERE user_id = ?", (del_u_id,))
+                        cursor.execute("DELETE FROM alacaklar WHERE user_id = ?", (del_u_id,))
+                        cursor.execute("DELETE FROM borclar WHERE user_id = ?", (del_u_id,))
+                        cursor.execute("DELETE FROM kullanicilar WHERE id = ?", (del_u_id,))
                         conn.commit()
                         conn.close()
-                        st.success(f"{del_user_id} ID'li kullanıcı tamamen silindi!")
+                        st.success("Kullanıcı silindi!")
                         st.rerun()
