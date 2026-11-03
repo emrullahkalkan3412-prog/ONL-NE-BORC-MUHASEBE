@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-# Sayfa Ayarları ve Streamlit Alt Bilgi / Paylaşım İkonlarını Kesin Olarak Gizleme
+# Sayfa Ayarları ve Streamlit Paylaşım/Deploy İkonlarını Kesin Olarak Gizleme
 st.set_page_config(
     page_title="Bireysel Muhasebe Platformu",
     page_icon="⚖️",
@@ -16,12 +16,14 @@ st.set_page_config(
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
-    footer {display: none !important; visibility: hidden !important;}
-    header {visibility: hidden;}
-    .stDeployButton {display: none !important;}
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    footer {display: none !important;}
+    header {visibility: hidden !important; display: none !important;}
+    .stDeployButton {display: none !important; visibility: hidden !important;}
+    div[data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
     .viewerBadge_link__1S137 {display: none !important;}
-    #GithubIcon {visibility: hidden;}
+    #GithubIcon {visibility: hidden !important;}
+    button[kind="header"] {display: none !important;}
+    .reportview-container .main footer {visibility: hidden !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
